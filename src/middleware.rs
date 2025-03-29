@@ -7,8 +7,8 @@ use axum::{
 };
 
 use crate::rate_limiter::{
-    LockFreeRateLimitState, LockFreeSlidingWindowRateLimiter, RateLimitState, RateLimiter,
-    RateLimiterEnum, SlidingWindowRateLimiter,
+    LockFreeRateLimitState, LockFreeSlidingWindowRateLimiter, RateLimitState, RateLimiterEnum,
+    SlidingWindowRateLimiter,
 };
 
 #[derive(Clone)]

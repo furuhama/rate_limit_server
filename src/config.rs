@@ -3,7 +3,6 @@ use std::sync::LazyLock;
 
 const DEFAULT_MAX_REQUESTS: u32 = 3;
 const DEFAULT_WINDOW_SECONDS: u64 = 5;
-const DEFAULT_RATE_LIMITER_TYPE: &str = "lock_free"; // デフォルトはロックフリー実装
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum RateLimiterType {

@@ -7,7 +7,7 @@ mod middleware;
 mod rate_limiter;
 
 use config::{RATE_LIMIT_CONFIG, RATE_LIMITER_TYPE, RateLimiterType};
-use middleware::{RateLimitStateEnum, rate_limit_middleware};
+use middleware::RateLimitStateEnum;
 use rate_limiter::{LockFreeRateLimitState, RateLimitState};
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::RwLock;
