@@ -6,10 +6,19 @@ use axum::{
     response::IntoResponse,
 };
 
-use crate::rate_limiter::{RateLimitState, RateLimiter, SlidingWindowRateLimiter};
+use crate::rate_limiter::{
+    LockFreeRateLimitState, LockFreeSlidingWindowRateLimiter, RateLimitState, RateLimiter,
+    RateLimiterEnum, SlidingWindowRateLimiter,
+};
+
+#[derive(Clone)]
+pub enum RateLimitStateEnum {
+    Standard(RateLimitState),
+    LockFree(LockFreeRateLimitState),
+}
 
 pub async fn rate_limit_middleware(
-    State(state): State<RateLimitState>,
+    State(state): State<RateLimitStateEnum>,
     req: Request<Body>,
     next: Next,
 ) -> Response<Body> {
@@ -25,7 +34,15 @@ pub async fn rate_limit_middleware(
     tracing::info!("Incoming request - IP: {}, Path: {}", ip, path);
 
     // レート制限のチェック
-    let limiter = SlidingWindowRateLimiter::new(state.requests.clone());
+    let limiter = match state {
+        RateLimitStateEnum::Standard(state) => {
+            RateLimiterEnum::Standard(SlidingWindowRateLimiter::new(state.requests))
+        }
+        RateLimitStateEnum::LockFree(state) => {
+            RateLimiterEnum::LockFree(LockFreeSlidingWindowRateLimiter::new(state.requests))
+        }
+    };
+
     match limiter.check_rate_limit(ip).await {
         Ok(_) => {
             limiter.record_request(ip).await;

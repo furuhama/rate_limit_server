@@ -37,10 +37,34 @@ while true; do curl localhost:3000; sleep 1; done
 
 ## Implementation Details
 
-The rate limiting is implemented using a sliding window approach:
-- Each IP address's requests are tracked in a thread-safe HashMap
+The server provides two different rate limiting implementations that can be switched using environment variables:
+
+### Standard Implementation (RwLock-based)
+- Uses `Arc<RwLock<HashMap>>` for thread-safe request tracking
+- Provides strict rate limiting with precise request counting
+- Suitable for scenarios where exact rate limiting is required
+- Enable with: `RATE_LIMITER_TYPE=standard cargo run`
+
+### Lock-Free Implementation (DashMap-based)
+- Uses `DashMap` for high-throughput concurrent access
+- Trades strict rate limiting for better performance
+- Suitable for high-traffic scenarios where approximate rate limiting is acceptable
+- Enable with: `RATE_LIMITER_TYPE=lock_free cargo run` (default)
+
+Both implementations use a sliding window approach:
+- Each IP address's requests are tracked separately
 - Old requests are automatically cleaned up
 - The server uses Axum's middleware system for rate limiting
+
+### Configuration Example
+
+```bash
+# Run with standard implementation and custom limits
+RATE_LIMITER_TYPE=standard RATE_LIMIT_MAX_REQUESTS=20 RATE_LIMIT_WINDOW_SECONDS=60 cargo run
+
+# Run with lock-free implementation (default)
+RATE_LIMITER_TYPE=lock_free cargo run
+```
 
 ## License
 
