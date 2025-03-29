@@ -13,12 +13,12 @@ A simple HTTP server with rate limiting functionality implemented in Rust using 
 
 The server supports configuration through environment variables:
 
-- `RATE_LIMIT_MAX_REQUESTS`: Maximum number of requests allowed per time window (default: 10)
-- `RATE_LIMIT_WINDOW_SECONDS`: Time window in seconds (default: 60)
+- `RATE_LIMIT_MAX_REQUESTS`: Maximum number of requests allowed per time window (default: 3)
+- `RATE_LIMIT_WINDOW_SECONDS`: Time window in seconds (default: 5)
 
 Example:
 ```bash
-RATE_LIMIT_MAX_REQUESTS=20 RATE_LIMIT_WINDOW_SECONDS=30 cargo run
+RATE_LIMIT_MAX_REQUESTS=20 RATE_LIMIT_WINDOW_SECONDS=60 cargo run
 ```
 
 This will set the rate limit to 20 requests per 30 seconds.

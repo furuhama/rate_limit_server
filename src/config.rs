@@ -1,8 +1,8 @@
 use std::env;
 use std::sync::LazyLock;
 
-const DEFAULT_MAX_REQUESTS: u32 = 10;
-const DEFAULT_WINDOW_SECONDS: u64 = 60;
+const DEFAULT_MAX_REQUESTS: u32 = 3;
+const DEFAULT_WINDOW_SECONDS: u64 = 5;
 
 #[derive(Clone)]
 pub struct RateLimitConfig {
