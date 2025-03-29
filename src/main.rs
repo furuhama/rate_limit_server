@@ -9,12 +9,43 @@ use axum::{
 };
 use std::{
     collections::HashMap,
+    env,
     net::SocketAddr,
     sync::Arc,
+    sync::LazyLock,
     time::{Duration, Instant},
 };
 use tokio::sync::RwLock;
 use tower::ServiceBuilder;
+
+const DEFAULT_MAX_REQUESTS: u32 = 10;
+const DEFAULT_WINDOW_SECONDS: u64 = 60;
+
+#[derive(Clone)]
+struct RateLimitConfig {
+    max_requests: u32,
+    window_seconds: u64,
+}
+
+impl Default for RateLimitConfig {
+    fn default() -> Self {
+        Self {
+            max_requests: DEFAULT_MAX_REQUESTS,
+            window_seconds: DEFAULT_WINDOW_SECONDS,
+        }
+    }
+}
+
+static RATE_LIMIT_CONFIG: LazyLock<RateLimitConfig> = LazyLock::new(|| RateLimitConfig {
+    max_requests: env::var("RATE_LIMIT_MAX_REQUESTS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(DEFAULT_MAX_REQUESTS),
+    window_seconds: env::var("RATE_LIMIT_WINDOW_SECONDS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(DEFAULT_WINDOW_SECONDS),
+});
 
 #[derive(Clone)]
 struct RateLimitState {
@@ -46,6 +77,11 @@ async fn main() {
     // サーバーの起動
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     tracing::info!("listening on {}", addr);
+    tracing::info!(
+        "rate limit config: {} requests per {} seconds",
+        RATE_LIMIT_CONFIG.max_requests,
+        RATE_LIMIT_CONFIG.window_seconds
+    );
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();
 }
@@ -66,8 +102,9 @@ async fn rate_limit_middleware(
     // レート制限のチェック
     let mut requests = state.requests.write().await;
     let now = Instant::now();
-    let window = Duration::from_secs(60); // 1分間のウィンドウ
-    let max_requests = 10; // 最大リクエスト数
+    let window_seconds = RATE_LIMIT_CONFIG.window_seconds;
+    let window = Duration::from_secs(window_seconds);
+    let max_requests = RATE_LIMIT_CONFIG.max_requests;
 
     // 古いリクエストを削除
     if let Some(timestamps) = requests.get_mut(&ip) {
@@ -77,10 +114,13 @@ async fn rate_limit_middleware(
     // 現在のリクエスト数を取得
     let current_requests = requests.get(&ip).map(|v| v.len()).unwrap_or(0);
 
-    if current_requests >= max_requests {
+    if current_requests >= max_requests as usize {
         return (
             StatusCode::TOO_MANY_REQUESTS,
-            "Rate limit exceeded. Please try again later.",
+            format!(
+                "Rate limit exceeded. Maximum {} requests per {} seconds.",
+                max_requests, window_seconds
+            ),
         )
             .into_response();
     }
