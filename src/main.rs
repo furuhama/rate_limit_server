@@ -52,6 +52,60 @@ struct RateLimitState {
     requests: Arc<RwLock<HashMap<String, Vec<Instant>>>>,
 }
 
+// レート制限のトレイト
+trait RateLimiter {
+    async fn check_rate_limit(&self, ip: &str) -> Result<(), String>;
+    async fn record_request(&self, ip: &str);
+}
+
+// スライディングウィンドウ方式のレート制限
+struct SlidingWindowRateLimiter {
+    requests: Arc<RwLock<HashMap<String, Vec<Instant>>>>,
+    config: &'static RateLimitConfig,
+}
+
+impl SlidingWindowRateLimiter {
+    fn new(requests: Arc<RwLock<HashMap<String, Vec<Instant>>>>) -> Self {
+        Self {
+            requests,
+            config: &RATE_LIMIT_CONFIG,
+        }
+    }
+}
+
+impl RateLimiter for SlidingWindowRateLimiter {
+    async fn check_rate_limit(&self, ip: &str) -> Result<(), String> {
+        let mut requests = self.requests.write().await;
+        let now = Instant::now();
+        let window = Duration::from_secs(self.config.window_seconds);
+
+        // 古いリクエストを削除
+        if let Some(timestamps) = requests.get_mut(ip) {
+            timestamps.retain(|&time| now.duration_since(time) <= window);
+        }
+
+        // 現在のリクエスト数を取得
+        let current_requests = requests.get(ip).map(|v| v.len()).unwrap_or(0);
+
+        if current_requests >= self.config.max_requests as usize {
+            Err(format!(
+                "Rate limit exceeded. Maximum {} requests per {} seconds.",
+                self.config.max_requests, self.config.window_seconds
+            ))
+        } else {
+            Ok(())
+        }
+    }
+
+    async fn record_request(&self, ip: &str) {
+        let mut requests = self.requests.write().await;
+        requests
+            .entry(ip.to_string())
+            .or_insert_with(Vec::new)
+            .push(Instant::now());
+    }
+}
+
 #[tokio::main]
 async fn main() {
     // ロギングの初期化
@@ -96,40 +150,17 @@ async fn rate_limit_middleware(
         .headers()
         .get("x-forwarded-for")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("unknown")
-        .to_string();
+        .unwrap_or("unknown");
 
     // レート制限のチェック
-    let mut requests = state.requests.write().await;
-    let now = Instant::now();
-    let window_seconds = RATE_LIMIT_CONFIG.window_seconds;
-    let window = Duration::from_secs(window_seconds);
-    let max_requests = RATE_LIMIT_CONFIG.max_requests;
-
-    // 古いリクエストを削除
-    if let Some(timestamps) = requests.get_mut(&ip) {
-        timestamps.retain(|&time| now.duration_since(time) <= window);
+    let limiter = SlidingWindowRateLimiter::new(state.requests.clone());
+    match limiter.check_rate_limit(ip).await {
+        Ok(_) => {
+            limiter.record_request(ip).await;
+            next.run(req).await
+        }
+        Err(message) => (StatusCode::TOO_MANY_REQUESTS, message).into_response(),
     }
-
-    // 現在のリクエスト数を取得
-    let current_requests = requests.get(&ip).map(|v| v.len()).unwrap_or(0);
-
-    if current_requests >= max_requests as usize {
-        return (
-            StatusCode::TOO_MANY_REQUESTS,
-            format!(
-                "Rate limit exceeded. Maximum {} requests per {} seconds.",
-                max_requests, window_seconds
-            ),
-        )
-            .into_response();
-    }
-
-    // 新しいリクエストを記録
-    requests.entry(ip).or_insert_with(Vec::new).push(now);
-
-    // 次のミドルウェアまたはハンドラーを実行
-    next.run(req).await
 }
 
 async fn handler() -> &'static str {
