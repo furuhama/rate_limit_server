@@ -18,7 +18,13 @@ async fn handler() -> &'static str {
 #[tokio::main]
 async fn main() {
     // ロギングの初期化
-    tracing_subscriber::fmt::init();
+    tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::INFO)
+        .with_target(false)
+        .with_thread_ids(true)
+        .with_file(true)
+        .with_line_number(true)
+        .init();
 
     // レート制限の状態管理
     let state = RateLimitState {
