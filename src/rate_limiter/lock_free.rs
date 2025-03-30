@@ -20,7 +20,6 @@ impl LockFreeRateLimitState {
     }
 }
 
-// ロックフリーなスライディングウィンドウ方式のレート制限
 #[derive(Clone)]
 pub struct LockFreeSlidingWindowRateLimiter {
     requests: Arc<DashMap<String, RequestState>>,
@@ -41,11 +40,11 @@ impl RateLimiter for LockFreeSlidingWindowRateLimiter {
         let now = Instant::now();
         let window = Duration::from_secs(self.config.window_seconds);
 
-        // レースコンディションを許容しつつ、リクエスト数をチェック
+        // Check request count while tolerating race conditions
         if let Some(mut entry) = self.requests.get_mut(ip) {
             let duration_since_last = now.duration_since(entry.last_updated);
 
-            // ウィンドウを超えた場合はカウンターをリセット
+            // Reset counter if window is exceeded
             if duration_since_last >= window {
                 entry.count = 0;
                 entry.last_updated = now;

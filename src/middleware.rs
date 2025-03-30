@@ -22,18 +22,15 @@ pub async fn rate_limit_middleware(
     req: Request<Body>,
     next: Next,
 ) -> Response<Body> {
-    // クライアントのIPアドレスを取得
     let ip = req
         .headers()
         .get("x-forwarded-for")
         .and_then(|v| v.to_str().ok())
         .unwrap_or("unknown");
 
-    // リクエスト情報のログ出力
     let path = req.uri().path();
     tracing::info!("Incoming request - IP: {}, Path: {}", ip, path);
 
-    // レート制限のチェック
     let limiter = match state {
         RateLimitStateEnum::Standard(state) => {
             RateLimiterEnum::Standard(SlidingWindowRateLimiter::new(state.requests))

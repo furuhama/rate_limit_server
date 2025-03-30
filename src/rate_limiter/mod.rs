@@ -6,7 +6,6 @@ pub struct RequestState {
     pub last_updated: Instant,
 }
 
-// レート制限のトレイト
 pub trait RateLimiter: Clone {
     async fn check_rate_limit(&self, ip: &str) -> Result<(), String>;
     async fn record_request(&self, ip: &str);

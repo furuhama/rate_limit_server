@@ -12,14 +12,13 @@ use rate_limiter::{LockFreeRateLimitState, RateLimitState};
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::RwLock;
 
-// 通常のレスポンスハンドラー
 async fn handler() -> &'static str {
     "Hello, World!"
 }
 
 #[tokio::main]
 async fn main() {
-    // ロギングの初期化
+    // Initialize logging
     tracing_subscriber::fmt()
         .with_max_level(tracing::Level::INFO)
         .with_target(false)
@@ -28,7 +27,7 @@ async fn main() {
         .with_line_number(true)
         .init();
 
-    // 環境変数に基づいてレート制限の実装を選択
+    // Select rate limiter implementation based on environment variable
     let state = match *RATE_LIMITER_TYPE {
         RateLimiterType::Standard => {
             tracing::info!("Using standard rate limiter");
@@ -42,19 +41,16 @@ async fn main() {
         }
     };
 
-    // ミドルウェアの構築
     let middleware = ServiceBuilder::new().layer(axum::middleware::from_fn_with_state(
         state.clone(),
         middleware::rate_limit_middleware,
     ));
 
-    // ルーターの構築
     let app = Router::new()
         .route("/", get(handler))
         .layer(middleware)
         .with_state(state);
 
-    // サーバーの起動
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     tracing::info!("listening on {}", addr);
     tracing::info!("rate limiter type: {:?}", *RATE_LIMITER_TYPE);

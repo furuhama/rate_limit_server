@@ -13,7 +13,6 @@ pub struct RateLimitState {
     pub requests: Arc<RwLock<HashMap<String, Vec<Instant>>>>,
 }
 
-// スライディングウィンドウ方式のレート制限
 #[derive(Clone)]
 pub struct SlidingWindowRateLimiter {
     requests: Arc<RwLock<HashMap<String, Vec<Instant>>>>,
@@ -35,12 +34,12 @@ impl RateLimiter for SlidingWindowRateLimiter {
         let now = Instant::now();
         let window = Duration::from_secs(self.config.window_seconds);
 
-        // 古いリクエストを削除
+        // Remove old requests
         if let Some(timestamps) = requests.get_mut(ip) {
             timestamps.retain(|&time| now.duration_since(time) <= window);
         }
 
-        // 現在のリクエスト数を取得
+        // Get current request count
         let current_requests = requests.get(ip).map(|v| v.len()).unwrap_or(0);
 
         if current_requests >= self.config.max_requests as usize {
