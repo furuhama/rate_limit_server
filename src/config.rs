@@ -14,7 +14,8 @@ impl RateLimiterType {
     pub fn from_env() -> Self {
         match env::var("RATE_LIMITER_TYPE").as_deref() {
             Ok("standard") => Self::Standard,
-            Ok("lock_free") | _ => Self::LockFree,
+            Ok("lock_free") => Self::LockFree,
+            _ => Self::LockFree,
         }
     }
 }
